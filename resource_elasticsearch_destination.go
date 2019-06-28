@@ -14,8 +14,12 @@ import (
 	elastic6 "gopkg.in/olivere/elastic.v6"
 )
 
-const DESTINATION_TYPE = "_doc"
-const DESTINATION_INDEX = ".opendistro-alerting-config"
+const (
+	// DestinationType ...
+	DestinationType = "_doc"
+	// DestinationIndex ...
+	DestinationIndex = ".opendistro-alerting-config"
+)
 
 func resourceElasticsearchDestination() *schema.Resource {
 	return &schema.Resource{
@@ -118,10 +122,10 @@ func resourceElasticsearchGetDestination(destinationID string, m interface{}) (*
 	switch m.(type) {
 	case *elastic7.Client:
 		client := m.(*elastic7.Client)
-		body, err = elastic7GetObject(client, DESTINATION_TYPE, DESTINATION_INDEX, destinationID)
+		body, err = elastic7GetObject(client, DestinationType, DestinationIndex, destinationID)
 	case *elastic6.Client:
 		client := m.(*elastic6.Client)
-		body, err = elastic6GetObject(client, DESTINATION_TYPE, DESTINATION_INDEX, destinationID)
+		body, err = elastic6GetObject(client, DestinationType, DestinationIndex, destinationID)
 	default:
 		err = errors.New("destination resource not implemented prior to Elastic v6")
 	}

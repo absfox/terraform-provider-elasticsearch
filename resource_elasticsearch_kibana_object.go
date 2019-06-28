@@ -13,6 +13,15 @@ import (
 	elastic6 "gopkg.in/olivere/elastic.v6"
 )
 
+const (
+	// IndexCreated is the constant for index creation success
+	IndexCreated int = iota
+	// IndexExists is the contant for an index that exists
+	IndexExists
+	// IndexCreationFailed is a constant for index creation failure
+	IndexCreationFailed
+)
+
 func resourceElasticsearchKibanaObject() *schema.Resource {
 	return &schema.Resource{
 		Create: resourceElasticsearchKibanaObjectCreate,
@@ -33,15 +42,9 @@ func resourceElasticsearchKibanaObject() *schema.Resource {
 	}
 }
 
-const (
-	INDEX_CREATED int = iota
-	INDEX_EXISTS
-	INDEX_CREATION_FAILED
-)
-
 func resourceElasticsearchKibanaObjectCreate(d *schema.ResourceData, meta interface{}) error {
 	index := d.Get("index").(string)
-	mapping_index := d.Get("index").(string)
+	mappingIndex := d.Get("index").(string)
 
 	var success int
 	var err error
@@ -50,10 +53,10 @@ func resourceElasticsearchKibanaObjectCreate(d *schema.ResourceData, meta interf
 		err = errors.New("kibana objects not implemented post to Elastic v7")
 	case *elastic6.Client:
 		client := meta.(*elastic6.Client)
-		success, err = elastic6CreateIndexIfNotExists(client, index, mapping_index)
+		success, err = elastic6CreateIndexIfNotExists(client, index, mappingIndex)
 	default:
 		client := meta.(*elastic5.Client)
-		success, err = elastic5CreateIndexIfNotExists(client, index, mapping_index)
+		success, err = elastic5CreateIndexIfNotExists(client, index, mappingIndex)
 	}
 
 	if err != nil {
@@ -61,9 +64,9 @@ func resourceElasticsearchKibanaObjectCreate(d *schema.ResourceData, meta interf
 		return err
 	}
 
-	if success == INDEX_CREATED {
+	if success == IndexCreated {
 		log.Printf("[INFO] Created new kibana index")
-	} else if success == INDEX_CREATION_FAILED {
+	} else if success == IndexCreationFailed {
 		return fmt.Errorf("fail to create the Elasticsearch index")
 	}
 
@@ -80,27 +83,26 @@ func resourceElasticsearchKibanaObjectCreate(d *schema.ResourceData, meta interf
 	return nil
 }
 
-func elastic6CreateIndexIfNotExists(client *elastic6.Client, index string, mapping_index string) (int, error) {
+func elastic6CreateIndexIfNotExists(client *elastic6.Client, index string, mappingIndex string) (int, error) {
 	log.Printf("[INFO] elastic6CreateIndexIfNotExists")
 
 	// Use the IndexExists service to check if a specified index exists.
 	exists, err := client.IndexExists(index).Do(context.TODO())
 	if err != nil {
-		return INDEX_CREATION_FAILED, err
+		return IndexCreationFailed, err
 	}
 	if !exists {
-		createIndex, err := client.CreateIndex(mapping_index).Body(`{"mappings":{}}`).Do(context.TODO())
+		createIndex, err := client.CreateIndex(mappingIndex).Body(`{"mappings":{}}`).Do(context.TODO())
 		if createIndex.Acknowledged {
-			return INDEX_CREATED, err
-		} else {
-			return INDEX_CREATION_FAILED, err
+			return IndexCreated, err
 		}
+		return IndexCreationFailed, err
 	}
 
-	return INDEX_EXISTS, nil
+	return IndexExists, nil
 }
 
-func elastic5CreateIndexIfNotExists(client *elastic5.Client, index string, mapping_index string) (int, error) {
+func elastic5CreateIndexIfNotExists(client *elastic5.Client, index string, mappingIndex string) (int, error) {
 	mapping := `{
 		"mappings": {
       "search": {
@@ -119,18 +121,17 @@ func elastic5CreateIndexIfNotExists(client *elastic5.Client, index string, mappi
 	// Use the IndexExists service to check if a specified index exists.
 	exists, err := client.IndexExists(index).Do(context.TODO())
 	if err != nil {
-		return INDEX_CREATION_FAILED, err
+		return IndexCreationFailed, err
 	}
 	if !exists {
-		createIndex, err := client.CreateIndex(mapping_index).Body(mapping).Do(context.TODO())
+		createIndex, err := client.CreateIndex(mappingIndex).Body(mapping).Do(context.TODO())
 		if createIndex.Acknowledged {
-			return INDEX_CREATED, err
-		} else {
-			return INDEX_CREATION_FAILED, err
+			return IndexCreated, err
 		}
+		return IndexCreationFailed, err
 	}
 
-	return INDEX_EXISTS, nil
+	return IndexExists, nil
 }
 
 func resourceElasticsearchKibanaObjectRead(d *schema.ResourceData, meta interface{}) error {
