@@ -8,11 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"regexp"
 
-	awscredentials "github.com/aws/aws-sdk-go/aws/credentials"
-	awssigv4 "github.com/aws/aws-sdk-go/aws/signer/v4"
-	"github.com/deoxxa/aws_signing_client"
 	"github.com/hashicorp/terraform/helper/pathorcontents"
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/hashicorp/terraform/terraform"
@@ -21,8 +17,7 @@ import (
 	elastic6 "gopkg.in/olivere/elastic.v6"
 )
 
-var awsUrlRegexp = regexp.MustCompile(`([a-z0-9-]+).es.amazonaws.com$`)
-
+// Provider returns new elasticsearch resource provider
 func Provider() terraform.ResourceProvider {
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
@@ -95,6 +90,7 @@ func Provider() terraform.ResourceProvider {
 		},
 
 		ResourcesMap: map[string]*schema.Resource{
+			"elasticsearch_index":               resourceElasticsearchIndex(),
 			"elasticsearch_index_template":      resourceElasticsearchIndexTemplate(),
 			"elasticsearch_snapshot_repository": resourceElasticsearchSnapshotRepository(),
 			"elasticsearch_kibana_object":       resourceElasticsearchKibanaObject(),
@@ -108,36 +104,41 @@ func Provider() terraform.ResourceProvider {
 }
 
 func providerConfigure(d *schema.ResourceData) (interface{}, error) {
-	rawUrl := d.Get("url").(string)
-	insecure := d.Get("insecure").(bool)
-	cacertFile := d.Get("cacert_file").(string)
+	rawURL := d.Get("url").(string)
+	// insecure := d.Get("insecure").(bool)
+	// cacertFile := d.Get("cacert_file").(string)
 	username := d.Get("username").(string)
 	password := d.Get("password").(string)
-	parsedUrl, err := url.Parse(rawUrl)
+	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, err
 	}
 
 	opts := []elastic7.ClientOptionFunc{
-		elastic7.SetURL(rawUrl),
-		elastic7.SetScheme(parsedUrl.Scheme),
+		elastic7.SetURL(rawURL),
+		elastic7.SetScheme(parsedURL.Scheme),
 	}
 
-	if parsedUrl.User.Username() != "" {
-		p, _ := parsedUrl.User.Password()
-		opts = append(opts, elastic7.SetBasicAuth(parsedUrl.User.Username(), p))
+	if parsedURL.User.Username() != "" {
+		p, _ := parsedURL.User.Password()
+		opts = append(opts, elastic7.SetBasicAuth(parsedURL.User.Username(), p))
 	}
 	if username != "" && password != "" {
 		opts = append(opts, elastic7.SetBasicAuth(username, password))
 	}
 
-	if m := awsUrlRegexp.FindStringSubmatch(parsedUrl.Hostname()); m != nil {
-		log.Printf("[INFO] Using AWS: %+v", m[1])
-		opts = append(opts, elastic7.SetHttpClient(awsHttpClient(m[1], d)), elastic7.SetSniff(false))
-	} else if insecure || cacertFile != "" {
-		opts = append(opts, elastic7.SetHttpClient(tlsHttpClient(d)), elastic7.SetSniff(false))
+	// if m := awsURLRegexp.FindStringSubmatch(parsedURL.Hostname()); m != nil {
+	// 	log.Printf("[INFO] Using AWS: %+v", m[1])
+	// 	opts = append(opts, elastic7.SetHttpClient(awsHTTPClient(m[1], d)), elastic7.SetSniff(false))
+	// } else if insecure || cacertFile != "" {
+	// 	opts = append(opts, elastic7.SetHttpClient(tlsHTTPClient(d)), elastic7.SetSniff(false))
+	// }
+	if parsedURL.Scheme == "https" {
+		opts = append(opts, elastic7.SetHttpClient(tlsHTTPClient(d)))
 	}
+	opts = append(opts, elastic7.SetSniff(false))
 
+	// client, err := elastic7.NewClient(elastic7.SetSniff(false))
 	var relevantClient interface{}
 	client, err := elastic7.NewClient(opts...)
 	if err != nil {
@@ -146,7 +147,7 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 	relevantClient = client
 
 	// Use the v6 client to ping the cluster to determine the version
-	info, _, err := client.Ping(rawUrl).Do(context.TODO())
+	info, _, err := client.Ping(rawURL).Do(context.TODO())
 	if err != nil {
 		return nil, err
 	}
@@ -154,24 +155,29 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 	if info.Version.Number < "7.0.0" && info.Version.Number >= "6.0.0" {
 		log.Printf("[INFO] Using ES 6")
 		opts := []elastic6.ClientOptionFunc{
-			elastic6.SetURL(rawUrl),
-			elastic6.SetScheme(parsedUrl.Scheme),
+			elastic6.SetURL(rawURL),
+			elastic6.SetScheme(parsedURL.Scheme),
 		}
 
-		if parsedUrl.User.Username() != "" {
-			p, _ := parsedUrl.User.Password()
-			opts = append(opts, elastic6.SetBasicAuth(parsedUrl.User.Username(), p))
+		if parsedURL.User.Username() != "" {
+			p, _ := parsedURL.User.Password()
+			opts = append(opts, elastic6.SetBasicAuth(parsedURL.User.Username(), p))
 		}
 		if username != "" && password != "" {
 			opts = append(opts, elastic6.SetBasicAuth(username, password))
 		}
 
-		if m := awsUrlRegexp.FindStringSubmatch(parsedUrl.Hostname()); m != nil {
-			log.Printf("[INFO] Using AWS: %+v", m[1])
-			opts = append(opts, elastic6.SetHttpClient(awsHttpClient(m[1], d)), elastic6.SetSniff(false))
-		} else if insecure || cacertFile != "" {
-			opts = append(opts, elastic6.SetHttpClient(tlsHttpClient(d)), elastic6.SetSniff(false))
+		// if m := awsURLRegexp.FindStringSubmatch(parsedURL.Hostname()); m != nil {
+		// 	log.Printf("[INFO] Using AWS: %+v", m[1])
+		// 	opts = append(opts, elastic6.SetHttpClient(awsHTTPClient(m[1], d)), elastic6.SetSniff(false))
+		// } else if insecure || cacertFile != "" {
+		// 	opts = append(opts, elastic6.SetHttpClient(tlsHTTPClient(d)), elastic6.SetSniff(false))
+		// }
+		if parsedURL.Scheme == "https" {
+			opts = append(opts, elastic6.SetHttpClient(tlsHTTPClient(d)))
 		}
+		opts = append(opts, elastic6.SetSniff(false))
+
 		relevantClient, err = elastic6.NewClient(opts...)
 		if err != nil {
 			return nil, err
@@ -179,53 +185,59 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 	} else if info.Version.Number < "6.0.0" && info.Version.Number >= "5.0.0" {
 		log.Printf("[INFO] Using ES 5")
 		opts := []elastic5.ClientOptionFunc{
-			elastic5.SetURL(rawUrl),
-			elastic5.SetScheme(parsedUrl.Scheme),
+			elastic5.SetURL(rawURL),
+			elastic5.SetScheme(parsedURL.Scheme),
 		}
 
-		if parsedUrl.User.Username() != "" {
-			p, _ := parsedUrl.User.Password()
-			opts = append(opts, elastic5.SetBasicAuth(parsedUrl.User.Username(), p))
+		if parsedURL.User.Username() != "" {
+			p, _ := parsedURL.User.Password()
+			opts = append(opts, elastic5.SetBasicAuth(parsedURL.User.Username(), p))
 		}
 		if username != "" && password != "" {
 			opts = append(opts, elastic5.SetBasicAuth(username, password))
 		}
 
-		if m := awsUrlRegexp.FindStringSubmatch(parsedUrl.Hostname()); m != nil {
-			opts = append(opts, elastic5.SetHttpClient(awsHttpClient(m[1], d)), elastic5.SetSniff(false))
-		} else if insecure || cacertFile != "" {
-			opts = append(opts, elastic5.SetHttpClient(tlsHttpClient(d)), elastic5.SetSniff(false))
+		// if m := awsURLRegexp.FindStringSubmatch(parsedURL.Hostname()); m != nil {
+		// 	opts = append(opts, elastic5.SetHttpClient(awsHTTPClient(m[1], d)), elastic5.SetSniff(false))
+		// } else if insecure || cacertFile != "" {
+		// 	opts = append(opts, elastic5.SetHttpClient(tlsHTTPClient(d)), elastic5.SetSniff(false))
+		// }
+
+		if parsedURL.Scheme == "https" {
+			opts = append(opts, elastic5.SetHttpClient(tlsHTTPClient(d)))
 		}
+		opts = append(opts, elastic5.SetSniff(false))
+
 		relevantClient, err = elastic5.NewClient(opts...)
 		if err != nil {
 			return nil, err
 		}
 	} else if info.Version.Number < "5.0.0" {
-		return nil, errors.New("ElasticSearch is older than 5.0.0!")
+		return nil, errors.New("elasticsearch is older than 5.0.0")
 	}
 
 	return relevantClient, nil
 }
 
-func awsHttpClient(region string, d *schema.ResourceData) *http.Client {
-	creds := awscredentials.NewChainCredentials([]awscredentials.Provider{
-		&awscredentials.StaticProvider{
-			Value: awscredentials.Value{
-				AccessKeyID:     d.Get("aws_access_key").(string),
-				SecretAccessKey: d.Get("aws_secret_key").(string),
-				SessionToken:    d.Get("aws_token").(string),
-			},
-		},
-		&awscredentials.EnvProvider{},
-		&awscredentials.SharedCredentialsProvider{},
-	})
-	signer := awssigv4.NewSigner(creds)
-	client, _ := aws_signing_client.New(signer, nil, "es", region)
+// func awsHTTPClient(region string, d *schema.ResourceData) *http.Client {
+// 	creds := awscredentials.NewChainCredentials([]awscredentials.Provider{
+// 		&awscredentials.StaticProvider{
+// 			Value: awscredentials.Value{
+// 				AccessKeyID:     d.Get("aws_access_key").(string),
+// 				SecretAccessKey: d.Get("aws_secret_key").(string),
+// 				SessionToken:    d.Get("aws_token").(string),
+// 			},
+// 		},
+// 		&awscredentials.EnvProvider{},
+// 		&awscredentials.SharedCredentialsProvider{},
+// 	})
+// 	signer := awssigv4.NewSigner(creds)
+// 	client, _ := aws_signing_client.New(signer, nil, "es", region)
 
-	return client
-}
+// 	return client
+// }
 
-func tlsHttpClient(d *schema.ResourceData) *http.Client {
+func tlsHTTPClient(d *schema.ResourceData) *http.Client {
 	insecure := d.Get("insecure").(bool)
 	cacertFile := d.Get("cacert_file").(string)
 	certPemPath := d.Get("client_cert_path").(string)
