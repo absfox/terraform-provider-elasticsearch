@@ -33,15 +33,17 @@ var (
 	configSchema = map[string]*schema.Schema{
 		// Static settings that can only be set on creation
 		"name": &schema.Schema{
-			Type:     schema.TypeString,
-			ForceNew: true,
-			Required: true,
+			Type:        schema.TypeString,
+			Description: "Name of the index to create",
+			ForceNew:    true,
+			Required:    true,
 		},
 		"number_of_shards": &schema.Schema{
-			Type:     schema.TypeInt,
-			ForceNew: true, // shards can only set upon creation
-			Default:  1,
-			Optional: true,
+			Type:        schema.TypeInt,
+			Description: "Number of shards for the index",
+			ForceNew:    true, // shards can only set upon creation
+			Default:     1,
+			Optional:    true,
 		},
 		// "check_on_startup": &schema.Schema{
 		// 	Type:     schema.TypeString, // false,checksum,true
@@ -69,12 +71,14 @@ var (
 		},
 		// Dynamic settings that can be changed at runtime
 		"number_of_replicas": &schema.Schema{
-			Type: schema.TypeInt,
+			Type:        schema.TypeInt,
+			Description: "Number of shard replicas",
 			// Default:  1,
 			Optional: true,
 		},
 		"auto_expand_replicas": &schema.Schema{
-			Type: schema.TypeString, // 0-5 OR 0-all
+			Type:        schema.TypeString, // 0-5 OR 0-all
+			Description: "Set the number of replicas to the node count in the cluster",
 			// Default:  "false",
 			Optional: true,
 		},

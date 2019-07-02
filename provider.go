@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -87,6 +87,12 @@ func Provider() terraform.ResourceProvider {
 				Description: "A X509 key to connect to elasticsearch",
 				DefaultFunc: schema.EnvDefaultFunc("ES_CLIENT_KEY_PATH", ""),
 			},
+			"enable_sniff": &schema.Schema{
+				Type:        schema.TypeBool,
+				Default:     false,
+				Optional:    true,
+				Description: "Enable sniffing on the elastisearch client",
+			},
 		},
 
 		ResourcesMap: map[string]*schema.Resource{
@@ -105,10 +111,14 @@ func Provider() terraform.ResourceProvider {
 
 func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 	rawURL := d.Get("url").(string)
+
 	// insecure := d.Get("insecure").(bool)
 	// cacertFile := d.Get("cacert_file").(string)
+
+	enableSniff := d.Get("enable_sniff").(bool)
 	username := d.Get("username").(string)
 	password := d.Get("password").(string)
+
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, err
@@ -136,9 +146,8 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 	if parsedURL.Scheme == "https" {
 		opts = append(opts, elastic7.SetHttpClient(tlsHTTPClient(d)))
 	}
-	opts = append(opts, elastic7.SetSniff(false))
+	opts = append(opts, elastic7.SetSniff(enableSniff))
 
-	// client, err := elastic7.NewClient(elastic7.SetSniff(false))
 	var relevantClient interface{}
 	client, err := elastic7.NewClient(opts...)
 	if err != nil {
@@ -176,12 +185,8 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		if parsedURL.Scheme == "https" {
 			opts = append(opts, elastic6.SetHttpClient(tlsHTTPClient(d)))
 		}
-		opts = append(opts, elastic6.SetSniff(false))
-
-		relevantClient, err = elastic6.NewClient(opts...)
-		if err != nil {
-			return nil, err
-		}
+		opts = append(opts, elastic6.SetSniff(enableSniff))
+		return elastic6.NewClient(opts...)
 	} else if info.Version.Number < "6.0.0" && info.Version.Number >= "5.0.0" {
 		log.Printf("[INFO] Using ES 5")
 		opts := []elastic5.ClientOptionFunc{
@@ -206,16 +211,13 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		if parsedURL.Scheme == "https" {
 			opts = append(opts, elastic5.SetHttpClient(tlsHTTPClient(d)))
 		}
-		opts = append(opts, elastic5.SetSniff(false))
-
-		relevantClient, err = elastic5.NewClient(opts...)
-		if err != nil {
-			return nil, err
-		}
+		opts = append(opts, elastic5.SetSniff(enableSniff))
+		return elastic5.NewClient(opts...)
 	} else if info.Version.Number < "5.0.0" {
-		return nil, errors.New("elasticsearch is older than 5.0.0")
+		return nil, fmt.Errorf("elasticsearch version %s not supported", info.Version.Number)
 	}
 
+	// Return 7 client
 	return relevantClient, nil
 }
 
@@ -236,6 +238,10 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 
 // 	return client
 // }
+
+func getAWSCreds() {
+
+}
 
 func tlsHTTPClient(d *schema.ResourceData) *http.Client {
 	insecure := d.Get("insecure").(bool)
