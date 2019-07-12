@@ -23,7 +23,7 @@ $(NAME):
 	go build -o $(NAME) .
 
 install: $(NAME)
-	stat $(PLUGIN_DIR) 2>/dev/null || mkdir -p $(PLUGIN_DIR)
+	stat $(PLUGIN_DIR) 2>&1 > /dev/null || mkdir -p $(PLUGIN_DIR)
 	cp $(NAME) $(PLUGIN_DIR)
 
 all: $(NAME)

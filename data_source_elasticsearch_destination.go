@@ -12,7 +12,7 @@ import (
 	elastic6 "gopkg.in/olivere/elastic.v6"
 )
 
-const DESTINATION_NAME_FIELD = "destination.name.keyword"
+const destinationNameField = "destination.name.keyword"
 
 func dataSourceElasticsearchDestination() *schema.Resource {
 	return &schema.Resource{
@@ -43,10 +43,10 @@ func dataSourceElasticsearchDestinationRead(d *schema.ResourceData, m interface{
 	switch m.(type) {
 	case *elastic7.Client:
 		client := m.(*elastic7.Client)
-		id, body, err = elastic7Search(client, DESTINATION_INDEX, destinationName)
+		id, body, err = elastic7Search(client, DestinationIndex, destinationName)
 	case *elastic6.Client:
 		client := m.(*elastic6.Client)
-		id, body, err = elastic6Search(client, DESTINATION_INDEX, destinationName)
+		id, body, err = elastic6Search(client, DestinationIndex, destinationName)
 	default:
 		err = errors.New("destination resource not implemented prior to Elastic v6")
 	}
@@ -69,7 +69,7 @@ func dataSourceElasticsearchDestinationRead(d *schema.ResourceData, m interface{
 }
 
 func elastic7Search(client *elastic7.Client, index string, name string) (string, *json.RawMessage, error) {
-	termQuery := elastic7.NewTermQuery(DESTINATION_NAME_FIELD, name)
+	termQuery := elastic7.NewTermQuery(destinationNameField, name)
 	result, err := client.Search().
 		Index(index).
 		Query(termQuery).
@@ -83,12 +83,12 @@ func elastic7Search(client *elastic7.Client, index string, name string) (string,
 	} else if result.TotalHits() < 1 {
 		return "", nil, err
 	} else {
-		return "", nil, fmt.Errorf("1 result expected, found %d.", result.TotalHits())
+		return "", nil, fmt.Errorf("1 result expected, found %d", result.TotalHits())
 	}
 }
 
 func elastic6Search(client *elastic6.Client, index string, name string) (string, *json.RawMessage, error) {
-	termQuery := elastic6.NewTermQuery(DESTINATION_NAME_FIELD, name)
+	termQuery := elastic6.NewTermQuery(destinationNameField, name)
 	result, err := client.Search().
 		Index(index).
 		Query(termQuery).
@@ -102,6 +102,6 @@ func elastic6Search(client *elastic6.Client, index string, name string) (string,
 	} else if result.TotalHits() < 1 {
 		return "", nil, err
 	} else {
-		return "", nil, fmt.Errorf("1 result expected, found %d.", result.TotalHits())
+		return "", nil, fmt.Errorf("1 result expected, found %d", result.TotalHits())
 	}
 }
