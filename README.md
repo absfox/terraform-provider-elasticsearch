@@ -20,12 +20,13 @@ See [the docs for more information](https://www.terraform.io/docs/plugins/basics
 
 ```tf
 provider "elasticsearch" {
-    url = "https://search-foo-bar-pqrhr4w3u4dzervg41frow4mmy.us-east-1.es.amazonaws.com" # Don't include port at the end for aws
-    aws_access_key = ""
-    aws_secret_key = ""
-    aws_token = "" # if necessary
-    insecure = true # to bypass certificate check
-    cacert_file = "/path/to/ca.crt" # when connecting to elastic with self-signed certificate
+    url = "https://search-foo-bar-pqrhr4w3u4dzervg41frow4mmy.us-east-1.es.amazonaws.com"
+}
+
+resource "elasticsearch_index" "test" {
+  name = "my-index-name"
+  number_of_shards = 2
+  number_of_replicas = 1
 }
 
 resource "elasticsearch_index_template" "test" {
